@@ -1,5 +1,9 @@
 package com.axiom;
 
+import com.axiom.common.registry.ModBlocks;
+import com.axiom.common.registry.ModContainers;
+import com.axiom.common.registry.ModItems;
+import com.axiom.common.registry.ModTileEntities;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
@@ -16,8 +20,15 @@ public class Axiom {
     public static final Logger LOGGER = LogManager.getLogger(MOD_ID);
 
     public Axiom() {
-        FMLJavaModLoadingContext.get().getModEventBus().addListener(this::commonSetup);
-        FMLJavaModLoadingContext.get().getModEventBus().addListener(this::clientSetup);
+        FMLJavaModLoadingContext context = FMLJavaModLoadingContext.get();
+        context.getModEventBus().addListener(this::commonSetup);
+        context.getModEventBus().addListener(this::clientSetup);
+
+        // Register the core game objects up front so later systems can build on a stable base.
+        ModBlocks.BLOCKS.register(context.getModEventBus());
+        ModItems.ITEMS.register(context.getModEventBus());
+        ModTileEntities.TILE_ENTITIES.register(context.getModEventBus());
+        ModContainers.CONTAINERS.register(context.getModEventBus());
 
         MinecraftForge.EVENT_BUS.register(this);
 
