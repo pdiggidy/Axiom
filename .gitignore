@@ -22,8 +22,12 @@ Thumbs.db
 # Claude Code
 .claude/
 
+# Codex
+.agents/
+
 # Project-specific
 CREDITS.txt
 LICENSE.txt
 changelog.txt
 README.txt
+docs/

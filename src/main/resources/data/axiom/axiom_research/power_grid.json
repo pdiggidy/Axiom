@@ -1,0 +1,8 @@
+{
+  "display_name": "Power Grid",
+  "prerequisites": ["axiom:basic_automation"],
+  "unlocks": [
+    { "type": "capability", "target": "axiom:electrical_grid" }
+  ],
+  "catalysts": ["minecraft:redstone"]
+}

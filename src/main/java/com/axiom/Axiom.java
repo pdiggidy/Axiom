@@ -1,10 +1,15 @@
 package com.axiom;
 
+import com.axiom.common.network.AxiomNetwork;
+import com.axiom.common.recipe.ModRecipes;
 import com.axiom.common.registry.ModBlocks;
 import com.axiom.common.registry.ModContainers;
 import com.axiom.common.registry.ModItems;
 import com.axiom.common.registry.ModTileEntities;
+import com.axiom.common.research.ResearchLoader;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.AddReloadListenerEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
@@ -24,11 +29,14 @@ public class Axiom {
         context.getModEventBus().addListener(this::commonSetup);
         context.getModEventBus().addListener(this::clientSetup);
 
-        // Register the core game objects up front so later systems can build on a stable base.
+        // Core game objects
         ModBlocks.BLOCKS.register(context.getModEventBus());
         ModItems.ITEMS.register(context.getModEventBus());
         ModTileEntities.TILE_ENTITIES.register(context.getModEventBus());
         ModContainers.CONTAINERS.register(context.getModEventBus());
+
+        // Recipe serializers (T02)
+        ModRecipes.register();
 
         MinecraftForge.EVENT_BUS.register(this);
 
@@ -36,6 +44,8 @@ public class Axiom {
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
+        // Network channel and packet registration (T01)
+        AxiomNetwork.registerPackets();
         LOGGER.info("Axiom common setup complete.");
     }
 
@@ -43,7 +53,14 @@ public class Axiom {
         LOGGER.info("Axiom client setup complete.");
     }
 
+    @SubscribeEvent
     public void onServerStarting(FMLServerStartingEvent event) {
         LOGGER.info("Axiom server starting.");
+    }
+
+    /** Register data-pack reload listeners so research definitions are hot-reloadable. */
+    @SubscribeEvent
+    public void onAddReloadListeners(AddReloadListenerEvent event) {
+        event.addListener(ResearchLoader.INSTANCE);
     }
 }

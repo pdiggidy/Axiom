@@ -1,0 +1,9 @@
+{
+  "display_name": "Basic Automation",
+  "prerequisites": [],
+  "unlocks": [
+    { "type": "machine", "target": "axiom:basic_machine" },
+    { "type": "item",    "target": "axiom:basic_belt" }
+  ],
+  "catalysts": []
+}

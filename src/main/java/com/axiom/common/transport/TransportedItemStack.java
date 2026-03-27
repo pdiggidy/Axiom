@@ -1,5 +1,6 @@
 package com.axiom.common.transport;
 
+import com.axiom.common.util.AxiomNbtKeys;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.CompoundNBT;
 
@@ -46,18 +47,18 @@ public class TransportedItemStack {
     public CompoundNBT serializeNBT() {
         CompoundNBT tag = new CompoundNBT();
         tag.put("stack", this.stack.serializeNBT());
-        tag.putFloat("belt_position", this.beltPosition);
-        tag.putFloat("previous_position", this.previousPosition);
-        tag.putFloat("side_offset", this.sideOffset);
+        tag.putFloat(AxiomNbtKeys.BELT_POSITION, this.beltPosition);
+        tag.putFloat(AxiomNbtKeys.PREVIOUS_POSITION, this.previousPosition);
+        tag.putFloat(AxiomNbtKeys.SIDE_OFFSET, this.sideOffset);
         return tag;
     }
 
     public static TransportedItemStack fromNBT(CompoundNBT tag) {
         return new TransportedItemStack(
                 ItemStack.of(tag.getCompound("stack")),
-                tag.getFloat("belt_position"),
-                tag.getFloat("previous_position"),
-                tag.getFloat("side_offset")
+                tag.getFloat(AxiomNbtKeys.BELT_POSITION),
+                tag.getFloat(AxiomNbtKeys.PREVIOUS_POSITION),
+                tag.getFloat(AxiomNbtKeys.SIDE_OFFSET)
         );
     }
 }
