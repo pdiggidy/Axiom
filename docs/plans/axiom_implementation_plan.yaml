@@ -1,0 +1,559 @@
+plan_name: Axiom implementation roadmap
+last_updated: 2026-03-27
+project_state:
+  summary: >
+    The current codebase is a minimal Forge 1.16.5 foundation with one basic
+    machine, one basic belt, shared block/tile/container registries, and simple
+    transported-item primitives. None of the major design-doc systems are
+    implemented yet.
+  current_foundation:
+    - DeferredRegister-based block, item, tile entity, and container registration
+    - Abstract machine and belt tile entity bases
+    - Basic transported item record and belt inventory
+    - Basic machine container/menu scaffolding
+  notable_gaps:
+    - No recipe/data-driven processing framework
+    - No capability wrappers beyond direct item access
+    - No power, research, world data, chunk management, GUI metrics, or multiblock systems
+    - No client rendering or overlays beyond the default setup hook
+source_documents:
+  - Axiom_Design_Document.docx
+  - Axiom_Progression_Philosophy.docx
+  - Axiom_Research_Gating_Notes.docx
+  - Axiom_Minecart_Design_Notes.docx
+  - Axiom_Constructor_Design_Notes.docx
+delegation_guidelines:
+  storage_strategy: >
+    Each task below is intentionally scoped with explicit write ownership so it
+    can be delegated to one agent without forcing overlap-heavy merges.
+  sequencing_rules:
+    - Finish T00 before parallel feature work starts.
+    - T01, T02, and T03 form the shared foundation for nearly every later task.
+    - T04 and T05 can proceed in parallel once T01-T03 land.
+    - T06 depends on T04 and T05.
+    - T07 depends on T01, T02, and T06.
+    - T08 depends on T01, T03, and T07.
+    - T09 depends on T01, T03, and T07.
+    - T10 depends on T01, T03, T04, and T06.
+    - T11 depends on T08 and T10.
+    - T12 depends on T04, T05, T06, T08, T09, and T10.
+  agent_handoff_template:
+    - Read the task entry and source_docs fields first.
+    - Stay within the write_scope unless coordination is required.
+    - Do not revert other agents' work; rebase your changes mentally onto the latest main branch state.
+    - Deliver code, tests, and any generated assets together.
+    - Report unresolved API seams explicitly if another task must consume them.
+parallel_batches:
+  - batch: foundation
+    tasks: [T00, T01, T02, T03]
+  - batch: midgame_systems
+    tasks: [T04, T05]
+  - batch: world_and_factory_expansion
+    tasks: [T07, T08, T09, T10]
+  - batch: integration_polish
+    tasks: [T11, T12]
+tasks:
+  - id: T00
+    title: Establish package architecture, coding contracts, and data conventions
+    phase: foundation
+    recommended_owner: architecture
+    recommended_agent_type: explorer_or_worker
+    depends_on: []
+    can_run_with: []
+    write_scope:
+      - src/main/java/com/axiom/Axiom.java
+      - src/main/java/com/axiom/common/**
+      - src/main/resources/**
+      - docs/plans/**
+    primary_packages:
+      - com.axiom.common
+    source_docs:
+      - Axiom_Design_Document.docx
+      - Axiom_Research_Gating_Notes.docx
+    objective: >
+      Refactor the current skeleton into stable package boundaries so later tasks
+      can add systems without churn or circular dependencies.
+    steps:
+      - Audit the current common package and define target package slices for block, blockentity, item, menu, network, power, research, logistics, rail, constructor, survey, world, and client code.
+      - Rename "tile" to a consistent Forge 1.16.5-era or project-preferred package name and standardize abstract base class responsibilities.
+      - Add shared constants, NBT key helpers, direction/position utilities, and registry helper patterns used by multiple systems.
+      - Introduce a saved-data strategy decision for world-level systems such as deposits, research definitions, rail reservations, and anchor coverage.
+      - Document canonical naming rules for blocks, items, menus, screens, packets, and data files.
+      - Add TODO-level extension points where later tasks need stable APIs, but avoid implementing feature logic here.
+    deliverables:
+      - Stable package map
+      - Shared utility layer
+      - Short architecture note in docs
+    acceptance_criteria:
+      - Later feature tasks can name their destination packages without inventing new top-level structure.
+      - No client-only classes are referenced from common code.
+      - World data and packet entry points have an agreed home.
+    risks:
+      - Over-refactoring the small foundation before shared APIs are clear
+  - id: T01
+    title: Build the core block entity, capability, and sync framework
+    phase: foundation
+    recommended_owner: platform_core
+    recommended_agent_type: worker
+    depends_on: [T00]
+    can_run_with: [T02, T03]
+    write_scope:
+      - src/main/java/com/axiom/common/block/base/**
+      - src/main/java/com/axiom/common/tile/base/**
+      - src/main/java/com/axiom/common/menu/base/**
+      - src/main/java/com/axiom/common/network/**
+      - src/main/java/com/axiom/common/registry/**
+    primary_packages:
+      - com.axiom.common.block.base
+      - com.axiom.common.tile.base
+      - com.axiom.common.network
+    source_docs:
+      - Axiom_Design_Document.docx
+    objective: >
+      Replace the minimal single-machine assumptions with reusable infrastructure
+      for item IO, side configuration, ticking, server-client sync, and GUI data.
+    steps:
+      - Introduce common packet registration and block entity sync packets for progress, metrics, and config changes.
+      - Extend abstract machine and belt bases with side-aware capability exposure instead of "all faces do everything".
+      - Add server-safe invalidation, lazy optional lifecycle handling, and update packet hooks.
+      - Build a generic machine data container contract for progress bars, throughput metrics, and power state.
+      - Create helper interfaces for tick throttling, metric emission, and block entity status reporting.
+      - Backfill the existing basic machine and belt to use the new framework as a proving case.
+    deliverables:
+      - Packet channel
+      - Capability wrappers
+      - Reusable synced block entity base classes
+    acceptance_criteria:
+      - Existing basic blocks still function after the refactor.
+      - A new machine can expose different IO rules per face without bespoke boilerplate.
+      - GUI-bound state sync no longer relies on ad hoc direct field exposure.
+    risks:
+      - Touches shared base classes that every later machine will inherit
+  - id: T02
+    title: Introduce data-driven content registries for recipes, research, and machine tiers
+    phase: foundation
+    recommended_owner: data_framework
+    recommended_agent_type: worker
+    depends_on: [T00]
+    can_run_with: [T01, T03]
+    write_scope:
+      - src/main/java/com/axiom/common/recipe/**
+      - src/main/java/com/axiom/common/research/**
+      - src/main/java/com/axiom/common/registry/**
+      - src/main/resources/data/axiom/**
+    primary_packages:
+      - com.axiom.common.recipe
+      - com.axiom.common.research
+    source_docs:
+      - Axiom_Design_Document.docx
+      - Axiom_Research_Gating_Notes.docx
+      - Axiom_Progression_Philosophy.docx
+    objective: >
+      Put all unlockable content behind JSON-backed definitions so progression
+      and balance can evolve without hardcoding every rule.
+    steps:
+      - Define recipe serializers/types for machine processing and transport-adjacent transformations.
+      - Define research definition JSON schemas with prerequisites, unlock outputs, optional catalysts, and UI metadata.
+      - Encode the "research unlocks gates, never stat modifiers" rule directly into the data model.
+      - Add machine tier and upgrade definition records for belts, cables, drill modules, shafts, carts, scanners, and constructor span limits.
+      - Register data reload listeners or startup loaders as appropriate for Forge 1.16.5.
+      - Seed a starter dataset for the currently implemented basic machine and a thin vertical slice of future content.
+    deliverables:
+      - Recipe system
+      - Research definition loader
+      - Initial JSON assets
+    acceptance_criteria:
+      - New unlocks can be added mostly by data entry plus registration.
+      - Research data never stores direct percentage buffs to world machines.
+      - Invalid definitions fail loudly with actionable logs.
+    risks:
+      - Data schema churn can ripple through every feature if this is unstable
+  - id: T03
+    title: Expand item transport into a full horizontal logistics layer
+    phase: foundation
+    recommended_owner: transport_core
+    recommended_agent_type: worker
+    depends_on: [T00]
+    can_run_with: [T01, T02]
+    write_scope:
+      - src/main/java/com/axiom/common/block/**/belt*
+      - src/main/java/com/axiom/common/tile/**/belt*
+      - src/main/java/com/axiom/common/transport/**
+      - src/main/java/com/axiom/client/**/belt*
+      - src/main/resources/assets/axiom/**
+    primary_packages:
+      - com.axiom.common.transport
+    source_docs:
+      - Axiom_Design_Document.docx
+    objective: >
+      Turn the current belt primitive into the main per-floor item movement system
+      with controller/delegate logic, routing rules, and machine interaction.
+    steps:
+      - Formalize belt controller graphs and delegate segment discovery.
+      - Implement insertion, extraction, blocking, lane occupancy, and handoff between adjacent belts and machines.
+      - Add corner, splitter, merger, and underground-adjacent crossing decisions where needed to preserve the 2D puzzle.
+      - Add serialization and chunk-safe restoration for moving items across belt segments.
+      - Add basic client rendering and debugging support so transport state is inspectable in play.
+      - Provide throughput hooks for later metrics UI work.
+    deliverables:
+      - Reliable belt transport graph
+      - Belt-machine interop
+      - Belt rendering/debug hooks
+    acceptance_criteria:
+      - Items move consistently across chunk saves and block updates.
+      - Belts remain horizontal-only by rule.
+      - Transport metrics can report items moved per unit time.
+    risks:
+      - Belt graph bugs will cascade into mining, constructor supply, and station loading
+  - id: T04
+    title: Implement the electrical grid, cable tiers, transformers, and brownout model
+    phase: midgame_systems
+    recommended_owner: power_systems
+    recommended_agent_type: worker
+    depends_on: [T01, T02, T03]
+    can_run_with: [T05]
+    write_scope:
+      - src/main/java/com/axiom/common/power/**
+      - src/main/java/com/axiom/common/block/**/power*
+      - src/main/java/com/axiom/common/tile/**/power*
+      - src/main/resources/data/axiom/**
+    primary_packages:
+      - com.axiom.common.power
+    source_docs:
+      - Axiom_Design_Document.docx
+      - Axiom_Research_Gating_Notes.docx
+    objective: >
+      Build Axiom's topological power network with visible physical upgrades and
+      proportional slowdown under load.
+    steps:
+      - Define network graph objects for cable segments, transformers, generators, storage, and consumers.
+      - Implement capacity-limited flow calculation with per-segment bottleneck detection.
+      - Add machine-facing power consumption APIs so every active block entity can scale work rate by available supply.
+      - Implement cable tiers, transformer boundary rules, and battery buffering.
+      - Create at least one early generator and one monitor block to validate the loop.
+      - Surface overloaded-segment metrics for GUI and overlay consumers.
+    deliverables:
+      - Power graph engine
+      - Cable/transformer blocks and block entities
+      - Brownout-aware machine power API
+    acceptance_criteria:
+      - Oversubscribed networks slow machines instead of hard-stopping them.
+      - Upgrading a physical cable segment resolves its bottleneck without global stat changes.
+      - Power state is deterministic on dedicated server and client.
+    risks:
+      - Network recalculation cost can become a performance hazard on large factories
+  - id: T05
+    title: Implement research data, research terminal flow, and player progression gates
+    phase: midgame_systems
+    recommended_owner: research_progression
+    recommended_agent_type: worker
+    depends_on: [T01, T02]
+    can_run_with: [T04]
+    write_scope:
+      - src/main/java/com/axiom/common/research/**
+      - src/main/java/com/axiom/common/block/**/research*
+      - src/main/java/com/axiom/common/tile/**/research*
+      - src/main/java/com/axiom/common/capability/**
+      - src/main/resources/data/axiom/research/**
+    primary_packages:
+      - com.axiom.common.research
+    source_docs:
+      - Axiom_Progression_Philosophy.docx
+      - Axiom_Research_Gating_Notes.docx
+      - Axiom_Design_Document.docx
+    objective: >
+      Build the dual-loop progression system where machine activity generates
+      passive research data and explicit research unlocks gate new capabilities.
+    steps:
+      - Choose and implement player or team progression storage, defaulting to player-scoped unless team mechanics are intentionally introduced.
+      - Add a research terminal block, container, GUI, and sync model.
+      - Define research data generation hooks from machine throughput rather than separate science-pack recipes.
+      - Implement optional research catalysts as acceleration items, not mandatory prerequisites.
+      - Gate recipe visibility, item use, block placement, or crafting outputs behind unlock checks as appropriate.
+      - Add migration-safe hooks so future machines can register their research data contribution formula.
+    deliverables:
+      - Research progression capability or saved data
+      - Research terminal UX
+      - Unlock enforcement layer
+    acceptance_criteria:
+      - Running useful machines advances research passively.
+      - Research unlocks new content but never mutates existing machine stats invisibly.
+      - Locked content fails gracefully with readable player feedback.
+    risks:
+      - Progression scope choices affect multiplayer semantics across the whole mod
+  - id: T06
+    title: Add the metrics-first UI and diagnostics layer
+    phase: midgame_systems
+    recommended_owner: ui_metrics
+    recommended_agent_type: worker
+    depends_on: [T01, T04, T05]
+    can_run_with: []
+    write_scope:
+      - src/main/java/com/axiom/client/gui/**
+      - src/main/java/com/axiom/client/render/**
+      - src/main/java/com/axiom/client/overlay/**
+      - src/main/java/com/axiom/common/menu/**
+      - src/main/resources/assets/axiom/**
+    primary_packages:
+      - com.axiom.client.gui
+      - com.axiom.client.overlay
+    source_docs:
+      - Axiom_Design_Document.docx
+      - Axiom_Progression_Philosophy.docx
+      - Axiom_Minecart_Design_Notes.docx
+      - Axiom_Constructor_Design_Notes.docx
+    objective: >
+      Create the visual language for throughput, bottlenecks, readiness, and
+      network state that differentiates Axiom from purely decorative tech mods.
+    steps:
+      - Replace placeholder containers with screens that can display progress, throughput, power state, and warnings.
+      - Build reusable metric widgets for rates, capacity bars, readiness indicators, and bottleneck callouts.
+      - Add overlay toggles for power networks, belt throughput, and later rail signaling occupancy.
+      - Expose shared localization keys and tooltip patterns for all metric-heavy machines.
+      - Add a debug-friendly developer overlay or log toggle for balancing during implementation.
+    deliverables:
+      - Reusable metric widgets
+      - Screen framework for machines and networks
+      - Overlay toggle plumbing
+    acceptance_criteria:
+      - Core systems can surface numbers without inventing one-off GUIs.
+      - Brownouts, missing materials, and blocked routes are visible to players.
+      - Overlay plumbing is reusable by rail and constructor tasks later.
+    risks:
+      - Client code separation must stay clean to avoid dedicated-server crashes
+  - id: T07
+    title: Implement surveying, deposit world data, and the Mine Head drilling loop
+    phase: world_and_factory_expansion
+    recommended_owner: mining_systems
+    recommended_agent_type: worker
+    depends_on: [T01, T02, T04, T05]
+    can_run_with: [T08, T09, T10]
+    write_scope:
+      - src/main/java/com/axiom/common/survey/**
+      - src/main/java/com/axiom/common/world/**
+      - src/main/java/com/axiom/common/block/**/mine*
+      - src/main/java/com/axiom/common/tile/**/mine*
+      - src/main/resources/data/axiom/**
+    primary_packages:
+      - com.axiom.common.survey
+      - com.axiom.common.world
+    source_docs:
+      - Axiom_Design_Document.docx
+      - Axiom_Progression_Philosophy.docx
+      - Axiom_Research_Gating_Notes.docx
+    objective: >
+      Create the hybrid ore progression loop: survey hidden deposits, place a
+      physical shaft, and trade mining depth against logistics cost.
+    steps:
+      - Implement world-saved deposit metadata generation and lookup, separate from vanilla ore blocks.
+      - Add shallow, deep, and pocket deposit generation rules plus debug visualization hooks.
+      - Implement Seismic Surveyor item and any machine-assisted survey mode required for rough versus detailed scans.
+      - Implement Mine Head multiblock validation, drill shaft blocks, shaft width tiers, and module attachment points.
+      - Calculate extraction rate and power cost from deposit distance, shaft width, installed modules, and available power.
+      - Output mined resources into Axiom logistics capabilities and deplete deposits over time.
+    deliverables:
+      - Deposit saved data and generation
+      - Seismic Surveyor flow
+      - Mine Head + shaft extraction system
+    acceptance_criteria:
+      - Deposits are finite, discoverable, and location-sensitive.
+      - Physical upgrades, not research stat buffs, drive mining efficiency gains.
+      - Mine output can feed belts or later rail stations.
+    risks:
+      - Worldgen and saved-data bugs are painful to migrate once worlds exist
+  - id: T08
+    title: Add vertical logistics primitives and anchor-aware infrastructure
+    phase: world_and_factory_expansion
+    recommended_owner: vertical_logistics
+    recommended_agent_type: worker
+    depends_on: [T01, T03, T07]
+    can_run_with: [T07, T09, T10]
+    write_scope:
+      - src/main/java/com/axiom/common/logistics/**
+      - src/main/java/com/axiom/common/anchor/**
+      - src/main/java/com/axiom/common/block/**/elevator*
+      - src/main/java/com/axiom/common/block/**/chute*
+      - src/main/java/com/axiom/common/block/**/tube*
+      - src/main/java/com/axiom/common/block/**/anchor*
+      - src/main/resources/data/axiom/**
+    primary_packages:
+      - com.axiom.common.logistics
+      - com.axiom.common.anchor
+    source_docs:
+      - Axiom_Design_Document.docx
+      - Axiom_Progression_Philosophy.docx
+    objective: >
+      Add the deliberate vertical transitions and chunk-presence infrastructure
+      needed to make three-dimensional factories legible and practical.
+    steps:
+      - Implement Gravity Chute, Bucket Elevator, and Pneumatic Tube blocks with distinct routing constraints.
+      - Keep vertical movement separate from belts so per-floor routing remains readable.
+      - Add item handoff rules between belts and these vertical logistics blocks.
+      - Implement Network Anchor and any late-game anchor upgrade as explicit chunk-presence infrastructure.
+      - Expose anchor coverage data for future mine, rail, and constructor systems.
+    deliverables:
+      - Three vertical logistics primitives
+      - Network Anchor system
+      - Shared chunk-presence API
+    acceptance_criteria:
+      - Upward transport is materially costlier than downward transport.
+      - Vertical logistics interoperate with belts without bypassing their horizontal identity.
+      - Anchors expose a stable API that other systems can query.
+    risks:
+      - Chunk loading behavior must be explicit and predictable for players
+  - id: T09
+    title: Implement the staged minecart logistics system with signaling
+    phase: world_and_factory_expansion
+    recommended_owner: rail_logistics
+    recommended_agent_type: worker
+    depends_on: [T01, T02, T03, T07]
+    can_run_with: [T07, T08, T10]
+    write_scope:
+      - src/main/java/com/axiom/common/rail/**
+      - src/main/java/com/axiom/common/block/**/rail*
+      - src/main/java/com/axiom/common/block/**/station*
+      - src/main/java/com/axiom/common/item/**/cart*
+      - src/main/java/com/axiom/client/**/rail*
+      - src/main/resources/data/axiom/**
+    primary_packages:
+      - com.axiom.common.rail
+    source_docs:
+      - Axiom_Minecart_Design_Notes.docx
+      - Axiom_Design_Document.docx
+    objective: >
+      Turn rails into Axiom's high-volume long-range logistics tier, from simple
+      haulers through scheduled consists with path and chain signals.
+    steps:
+      - Implement Bulk Hauler carts and waypoint-based fixed loops.
+      - Implement station blocks, manifest-based routing, named station groups, and filtered load/unload behavior.
+      - Implement locomotive plus consist coupling and train-level schedules.
+      - Build signal reservation logic for path and chain signals, plus deadlock-resistant intersection behavior.
+      - Add loading arms, stacker sidings support, and station throughput accounting.
+      - Add rail occupancy overlay integration using the UI framework from T06.
+      - Integrate route behavior with anchor coverage or explicit loaded-chunk constraints.
+    deliverables:
+      - Tiered cart system
+      - Stations and loading arms
+      - Signal/reservation engine
+    acceptance_criteria:
+      - Early carts solve mine-to-base bulk hauling before full train complexity appears.
+      - Mid and late rail tiers scale by station naming and consist size, not by manual per-cart micromanagement.
+      - Shared tracks avoid common deadlocks under normal signaled use.
+    risks:
+      - Reservation logic and chunk handling are the hardest technical pieces in the transport stack
+  - id: T10
+    title: Implement the schematic system and Constructor gantry
+    phase: world_and_factory_expansion
+    recommended_owner: constructor_systems
+    recommended_agent_type: worker
+    depends_on: [T01, T02, T03, T04, T06]
+    can_run_with: [T07, T08, T09]
+    write_scope:
+      - src/main/java/com/axiom/common/constructor/**
+      - src/main/java/com/axiom/common/block/**/constructor*
+      - src/main/java/com/axiom/common/item/**/schematic*
+      - src/main/java/com/axiom/common/item/**/scanner*
+      - src/main/java/com/axiom/client/**/constructor*
+      - src/main/resources/data/axiom/**
+    primary_packages:
+      - com.axiom.common.constructor
+    source_docs:
+      - Axiom_Constructor_Design_Notes.docx
+      - Axiom_Progression_Philosophy.docx
+      - Axiom_Design_Document.docx
+    objective: >
+      Deliver Axiom's signature auto-construction feature: scan structures into
+      schematic items and replay them through a visible gantry-based builder.
+    steps:
+      - Implement Schematic Scanner item, capture-volume selection, naming flow, and item-backed schematic storage.
+      - Define schematic serialization for block states, air, manifest counts, orientation metadata, and origin alignment.
+      - Implement Constructor Controller, rails, crossbeam, build head, and multiblock validation.
+      - Build Controller inventory, manifest readiness, power draw, pause/resume, and layer-boundary execution logic.
+      - Implement conflict handling for pre-existing blocks, repair mode behavior, and item recovery/output when clearing blocks.
+      - Support rotation and mirroring transforms before build start.
+      - Integrate build metrics into the UI framework and anchor-awareness for loaded-chunk-only operation.
+    deliverables:
+      - Scanner and schematic item format
+      - Constructor gantry multiblock
+      - Layer-based build execution engine
+    acceptance_criteria:
+      - A captured structure can be rebuilt elsewhere with correct orientation.
+      - The Constructor only advances at valid layer boundaries and pauses cleanly on missing materials or low power.
+      - The machine remains visually legible and chunk-load honest.
+    risks:
+      - Multiblock movement and schematic correctness create a large surface area for subtle bugs
+  - id: T11
+    title: Add factory-map overlays, top-down diagnostics, and production observability
+    phase: integration_polish
+    recommended_owner: client_observability
+    recommended_agent_type: worker
+    depends_on: [T06, T08, T10]
+    can_run_with: [T12]
+    write_scope:
+      - src/main/java/com/axiom/client/overlay/**
+      - src/main/java/com/axiom/client/screen/**
+      - src/main/java/com/axiom/client/input/**
+      - src/main/resources/assets/axiom/**
+    primary_packages:
+      - com.axiom.client.overlay
+    source_docs:
+      - Axiom_Design_Document.docx
+      - Axiom_Minecart_Design_Notes.docx
+      - Axiom_Constructor_Design_Notes.docx
+    objective: >
+      Improve readability of complex factories with map-like views and focused
+      diagnostics instead of forcing the player to parse everything in-world.
+    steps:
+      - Implement keybind-driven overlays for current-floor logistics, power bottlenecks, rail occupancy, and constructor progress.
+      - Decide whether to ship only overlays or a limited top-down factory screen in the first milestone.
+      - Build data aggregation queries that summarize nearby network state without requiring every block to render custom labels.
+      - Ensure overlays degrade gracefully when systems are absent or chunks are unloaded.
+    deliverables:
+      - Input bindings
+      - Unified factory observability overlay
+      - Optional top-down screen prototype
+    acceptance_criteria:
+      - Players can inspect bottlenecks faster than by opening every machine individually.
+      - Overlay code does not introduce common/client coupling regressions.
+    risks:
+      - Rendering scope can expand quickly if left unbounded
+  - id: T12
+    title: Integration pass, balance pass, dedicated-server verification, and content polish
+    phase: integration_polish
+    recommended_owner: integration_and_qa
+    recommended_agent_type: worker
+    depends_on: [T04, T05, T06, T08, T09, T10]
+    can_run_with: [T11]
+    write_scope:
+      - src/**
+      - docs/**
+      - gradle/**
+      - build.gradle
+    primary_packages:
+      - whole_project
+    source_docs:
+      - Axiom_Design_Document.docx
+      - Axiom_Progression_Philosophy.docx
+      - Axiom_Research_Gating_Notes.docx
+      - Axiom_Minecart_Design_Notes.docx
+      - Axiom_Constructor_Design_Notes.docx
+    objective: >
+      Make the feature slices behave like one coherent mod with sane defaults,
+      progression pacing, and dedicated-server safety.
+    steps:
+      - Run focused integration scenarios: starter smelting line, researched power expansion, surveyed mining outpost, train-fed depot, and constructor-fed module replication.
+      - Verify every progression gate unlocks physical capabilities rather than invisible stat boosts.
+      - Rebalance recipe costs, power draw, research rates, and transport throughput around the dual-loop philosophy.
+      - Test chunk loading, save/load, and server join behavior for all world-state-heavy systems.
+      - Add missing localization, loot/data assets, tags, advancements, and recipe book integration where relevant.
+      - Write contributor docs describing how to add a new machine, research node, rail asset, or schematic-compatible block.
+    deliverables:
+      - Integrated gameplay tuning
+      - Regression fixes
+      - Contributor/developer notes
+    acceptance_criteria:
+      - Dedicated server startup and join/play loops are stable.
+      - The first hour of content delivers useful factory value before demanding deep infrastructure.
+      - Major systems interoperate without special-case glue everywhere.
+    risks:
+      - Balance work can reopen assumptions from earlier tasks
